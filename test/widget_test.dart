@@ -5,7 +5,11 @@ import 'package:worldwide_channel_surf/main.dart';
 
 void main() {
   testWidgets('App should start with HomeScreen', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MyApp(),
+      ),
+    );
 
     // Should show the home screen
     expect(find.byType(MaterialApp), findsOneWidget);
@@ -15,7 +19,11 @@ void main() {
   });
 
   testWidgets('App should have correct title', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MyApp(),
+      ),
+    );
 
     // MaterialApp should be present
     final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
