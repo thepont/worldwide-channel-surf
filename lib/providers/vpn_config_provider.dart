@@ -1,22 +1,52 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:worldwide_channel_surf/models/vpn_config.dart';
+import 'package:worldwide_channel_surf/core/database_service.dart';
 
+/// Provider for managing VPN configurations with database persistence
 class VpnConfigNotifier extends StateNotifier<List<VpnConfig>> {
-  VpnConfigNotifier() : super([]);
+  final DatabaseService _dbService = DatabaseService();
 
-  void addConfig(VpnConfig config) {
-    state = [...state, config];
-    // TODO: Save to persistent storage
+  VpnConfigNotifier() : super([]) {
+    _loadConfigs();
   }
 
-  void updateConfig(String id, VpnConfig updatedConfig) {
-    state = state.map((config) => config.id == id ? updatedConfig : config).toList();
-    // TODO: Save to persistent storage
+  Future<void> _loadConfigs() async {
+    try {
+      final configs = await _dbService.getVpnConfigs();
+      state = configs;
+    } catch (e) {
+      state = [];
+    }
   }
 
-  void removeConfig(String id) {
-    state = state.where((config) => config.id != id).toList();
-    // TODO: Save to persistent storage
+  Future<void> addConfig(VpnConfig config) async {
+    try {
+      await _dbService.saveVpnConfig(config);
+      await _loadConfigs();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateConfig(VpnConfig updatedConfig) async {
+    try {
+      if (updatedConfig.id == null) {
+        throw Exception('Cannot update config without ID');
+      }
+      await _dbService.saveVpnConfig(updatedConfig);
+      await _loadConfigs();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> removeConfig(int id) async {
+    try {
+      await _dbService.deleteVpnConfig(id);
+      await _loadConfigs();
+    } catch (e) {
+      rethrow;
+    }
   }
 
   VpnConfig? getConfigByRegionId(String regionId) {
@@ -25,6 +55,11 @@ class VpnConfigNotifier extends StateNotifier<List<VpnConfig>> {
     } catch (e) {
       return null;
     }
+  }
+
+  /// Refresh configs from database
+  Future<void> refresh() async {
+    await _loadConfigs();
   }
 }
 

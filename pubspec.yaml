@@ -10,7 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_riverpod: ^2.4.9
-  webview_flutter: ^4.4.2
+  webview_cef: ^0.2.2  # Desktop (Linux/Windows/macOS) - Embedded Chromium
+  webview_flutter: ^4.4.2  # Mobile (Android/iOS) - Native webview
   url_launcher: ^6.2.2
   openvpn_flutter: ^1.3.0
   flutter_secure_storage: ^9.0.0
@@ -20,12 +21,20 @@ dependencies:
   sqflite: ^2.3.0
   sqflite_common_ffi: ^2.3.0
   path: ^1.8.3
+  shelf: ^1.4.1  # Local web server for phone setup
+  shelf_router: ^1.1.4  # Router for shelf
+  qr_flutter: ^4.1.0  # QR code for setup screen
+  network_info_plus: ^5.0.1  # Get device local IP
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/js/spatial_navigation.js
 

@@ -6,19 +6,30 @@ void main() {
   group('VpnConfig', () {
     test('should create a VpnConfig with template-based config', () {
       const config = VpnConfig(
-        id: 'config1',
+        id: 1,
         name: 'UK NordVPN',
         regionId: 'UK',
         templateId: 'nordvpn',
         serverAddress: 'uk1234.nordvpn.com',
       );
 
-      expect(config.id, equals('config1'));
+      expect(config.id, equals(1));
       expect(config.name, equals('UK NordVPN'));
       expect(config.regionId, equals('UK'));
       expect(config.templateId, equals('nordvpn'));
       expect(config.serverAddress, equals('uk1234.nordvpn.com'));
       expect(config.customOvpnContent, isNull);
+    });
+
+    test('should create a VpnConfig without id for new entries', () {
+      const config = VpnConfig(
+        name: 'New VPN',
+        regionId: 'FR',
+        templateId: 'nordvpn',
+      );
+
+      expect(config.id, isNull);
+      expect(config.name, equals('New VPN'));
     });
 
     test('should create a VpnConfig with custom .ovpn content', () {
@@ -30,7 +41,7 @@ remote example.com 1194
 ''';
 
       const config = VpnConfig(
-        id: 'config2',
+        id: 2,
         name: 'Custom VPN',
         regionId: 'FR',
         templateId: 'custom_ovpn',
@@ -44,7 +55,6 @@ remote example.com 1194
 
     test('should support both serverAddress and customOvpnContent being null', () {
       const config = VpnConfig(
-        id: 'config3',
         name: 'Empty Config',
         regionId: 'AU',
         templateId: 'nordvpn',
@@ -56,13 +66,64 @@ remote example.com 1194
 
     test('should use RegionId type', () {
       const config = VpnConfig(
-        id: 'test',
         name: 'Test',
         regionId: 'UK',
         templateId: 'nordvpn',
       );
 
       expect(config.regionId, isA<RegionId>());
+    });
+
+    test('should convert to map for database storage', () {
+      const config = VpnConfig(
+        id: 5,
+        name: 'Test VPN',
+        regionId: 'UK',
+        templateId: 'nordvpn',
+        serverAddress: 'test.server.com',
+      );
+
+      final map = config.toMap();
+
+      expect(map['id'], equals(5));
+      expect(map['name'], equals('Test VPN'));
+      expect(map['region_id'], equals('UK'));
+      expect(map['template_id'], equals('nordvpn'));
+      expect(map['server_address'], equals('test.server.com'));
+    });
+
+    test('should create from map (database result)', () {
+      final map = {
+        'id': 10,
+        'name': 'Restored VPN',
+        'region_id': 'US',
+        'template_id': 'nordvpn',
+        'server_address': 'us123.nordvpn.com',
+        'custom_ovpn_content': null,
+      };
+
+      final config = VpnConfig.fromMap(map);
+
+      expect(config.id, equals(10));
+      expect(config.name, equals('Restored VPN'));
+      expect(config.regionId, equals('US'));
+      expect(config.templateId, equals('nordvpn'));
+    });
+
+    test('should copy with updated fields', () {
+      const original = VpnConfig(
+        id: 1,
+        name: 'Original',
+        regionId: 'UK',
+        templateId: 'nordvpn',
+      );
+
+      final updated = original.copyWith(name: 'Updated', regionId: 'FR');
+
+      expect(updated.id, equals(1));
+      expect(updated.name, equals('Updated'));
+      expect(updated.regionId, equals('FR'));
+      expect(updated.templateId, equals('nordvpn'));
     });
   });
 }

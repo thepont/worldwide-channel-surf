@@ -43,7 +43,7 @@ void main() {
       final service = container.read(vpnTemplateServiceProvider);
 
       const config = VpnConfig(
-        id: 'test1',
+        id: 1,
         name: 'Test',
         regionId: 'UK',
         templateId: 'custom_ovpn',
@@ -61,7 +61,7 @@ void main() {
       final service = container.read(vpnTemplateServiceProvider);
 
       const config = VpnConfig(
-        id: 'test2',
+        id: 2,
         name: 'Test',
         regionId: 'UK',
         templateId: 'custom_ovpn',

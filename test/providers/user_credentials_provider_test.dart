@@ -4,6 +4,10 @@ import 'package:worldwide_channel_surf/providers/user_credentials_provider.dart'
 import 'package:worldwide_channel_surf/models/user_credentials.dart';
 
 void main() {
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+  });
+
   group('UserCredentialsNotifier', () {
     test('should start with empty credentials map', () {
       final container = ProviderContainer();

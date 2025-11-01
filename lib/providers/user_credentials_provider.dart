@@ -4,6 +4,8 @@ import 'package:worldwide_channel_surf/models/user_credentials.dart';
 import 'dart:convert';
 
 class UserCredentialsNotifier extends StateNotifier<Map<String, UserCredentials>> {
+  // Configure secure storage for Linux
+  // Note: Keyring warnings are non-critical - storage will fallback to file-based
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static const String _storageKey = 'user_credentials';
 
