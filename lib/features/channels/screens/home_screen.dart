@@ -129,6 +129,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ..sort();
     }
 
+    // Ensure the current region value exists in the available regions
+    // If not, set it to null to avoid DropdownButton errors
+    RegionId? validRegion = currentRegion;
+    if (currentRegion != null && !availableRegions.contains(currentRegion)) {
+      validRegion = null;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('International Channel Browser'),
@@ -136,7 +143,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: DropdownButton<RegionId?>(
-              value: currentRegion,
+              value: validRegion,
               hint: const Text('Set Region', style: TextStyle(color: Colors.white)),
               underline: Container(), // Hides the underline
               icon: const Icon(Icons.public, color: Colors.white),
@@ -197,13 +204,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           );
         },
         error: (err, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Error loading channels: ${err.toString()}'),
-            ],
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading channels: ${err.toString()}',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         loading: () => const Center(
