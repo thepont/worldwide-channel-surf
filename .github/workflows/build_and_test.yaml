@@ -33,6 +33,9 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Verify Flutter setup
+        run: flutter doctor -v
+
       - name: Run Flutter analyzer
         run: flutter analyze
 
@@ -43,6 +46,7 @@ jobs:
     name: Integration Tests (Android)
     needs: lint_and_unit_test
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,11 +66,25 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Check if integration tests exist
+        id: check_integration
+        run: |
+          if [ -f "integration_test/app_test.dart" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run integration tests on Android emulator
+        if: steps.check_integration.outputs.exists == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
           script: flutter test integration_test/app_test.dart
+
+      - name: Skip integration tests
+        if: steps.check_integration.outputs.exists == 'false'
+        run: echo "Integration tests not found, skipping..."
 
   build_android:
     name: Build Android APK

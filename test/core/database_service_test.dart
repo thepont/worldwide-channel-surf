@@ -10,6 +10,12 @@ void main() {
       service = DatabaseService();
     });
 
+    tearDown(() async {
+      // Clean up database instance between tests
+      // Note: DatabaseService uses singleton, so we can't easily reset
+      // But tests should be independent and use the same instance
+    });
+
     test('should be a singleton', () {
       final service1 = DatabaseService();
       final service2 = DatabaseService();

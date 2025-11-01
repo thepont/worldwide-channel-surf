@@ -27,57 +27,73 @@ void main() {
     test('should load channels from database', () async {
       final container = ProviderContainer();
       
-      // Wait for the async provider to complete
-      await container.read(channelListProvider.future);
+      try {
+        // Wait for the async provider to complete
+        await container.read(channelListProvider.future);
 
-      final asyncValue = container.read(channelListProvider);
-      expect(asyncValue.hasValue, isTrue);
-      
-      final channels = asyncValue.value!;
-      expect(channels, isA<List<Channel>>());
-      expect(channels.length, greaterThan(0));
+        final asyncValue = container.read(channelListProvider);
+        expect(asyncValue.hasValue, isTrue);
+        
+        final channels = asyncValue.value!;
+        expect(channels, isA<List<Channel>>());
+        expect(channels.length, greaterThan(0));
+      } finally {
+        container.dispose();
+      }
     });
 
     test('should include BBC iPlayer with UK region', () async {
       final container = ProviderContainer();
       
-      final channels = await container.read(channelListProvider.future);
+      try {
+        final channels = await container.read(channelListProvider.future);
 
-      final bbcChannel = channels.firstWhere(
-        (ch) => ch.name == 'BBC iPlayer',
-      );
+        final bbcChannel = channels.firstWhere(
+          (ch) => ch.name == 'BBC iPlayer',
+        );
 
-      expect(bbcChannel.targetRegionId, equals('UK'));
-      expect(bbcChannel.url, contains('bbc.co.uk'));
-      expect(bbcChannel.id, isNotNull); // Should have an ID from DB
+        expect(bbcChannel.targetRegionId, equals('UK'));
+        expect(bbcChannel.url, contains('bbc.co.uk'));
+        expect(bbcChannel.id, isNotNull); // Should have an ID from DB
+      } finally {
+        container.dispose();
+      }
     });
 
     test('should include seeded channels', () async {
       final container = ProviderContainer();
       
-      final channels = await container.read(channelListProvider.future);
+      try {
+        final channels = await container.read(channelListProvider.future);
 
-      // Check for various seeded channels
-      final channelNames = channels.map((ch) => ch.name).toList();
-      
-      expect(channelNames, contains('BBC iPlayer'));
-      expect(channelNames, contains('ABC iview'));
-      expect(channelNames, contains('10 Play'));
-      expect(channelNames, contains('France.tv'));
+        // Check for various seeded channels
+        final channelNames = channels.map((ch) => ch.name).toList();
+        
+        expect(channelNames, contains('BBC iPlayer'));
+        expect(channelNames, contains('ABC iview'));
+        expect(channelNames, contains('10 Play'));
+        expect(channelNames, contains('France.tv'));
+      } finally {
+        container.dispose();
+      }
     });
 
     test('should provide channels sorted by name', () async {
       final container = ProviderContainer();
       
-      final channels = await container.read(channelListProvider.future);
+      try {
+        final channels = await container.read(channelListProvider.future);
 
-      // Verify channels are sorted alphabetically
-      for (int i = 0; i < channels.length - 1; i++) {
-        expect(
-          channels[i].name.compareTo(channels[i + 1].name),
-          lessThanOrEqualTo(0),
-          reason: 'Channels should be sorted by name',
-        );
+        // Verify channels are sorted alphabetically
+        for (int i = 0; i < channels.length - 1; i++) {
+          expect(
+            channels[i].name.compareTo(channels[i + 1].name),
+            lessThanOrEqualTo(0),
+            reason: 'Channels should be sorted by name',
+          );
+        }
+      } finally {
+        container.dispose();
       }
     });
   });
