@@ -27,15 +27,34 @@ class _ProviderSelectionScreenState extends ConsumerState<ProviderSelectionScree
   bool _isConnecting = false;
   String? _error;
 
-  /// Group providers by region
-  Map<RegionId, List<WatchProvider>> _groupProvidersByRegion() {
-    final Map<RegionId, List<WatchProvider>> grouped = {};
+  /// Filter and group providers by service name and type (free vs subscription)
+  /// Returns a map: ProviderType -> (service name -> regions map)
+  Map<ProviderType, Map<String, Map<RegionId, WatchProvider>>> _groupProvidersByTypeAndService() {
+    final Map<ProviderType, Map<String, Map<RegionId, WatchProvider>>> grouped = {};
     
     for (final provider in widget.providers) {
-      if (!grouped.containsKey(provider.regionId)) {
-        grouped[provider.regionId] = [];
+      // Filter out buy and rent providers
+      if (provider.providerType == ProviderType.rent) {
+        continue; // Skip rent providers
       }
-      grouped[provider.regionId]!.add(provider);
+      
+      // Initialize type group if needed
+      if (!grouped.containsKey(provider.providerType)) {
+        grouped[provider.providerType] = {};
+      }
+      
+      final typeGroup = grouped[provider.providerType]!;
+      
+      // Initialize service if needed
+      if (!typeGroup.containsKey(provider.name)) {
+        typeGroup[provider.name] = {};
+      }
+      
+      // Use region as key - if same service has multiple providers in same region,
+      // keep the first one (shouldn't happen but just in case)
+      if (!typeGroup[provider.name]!.containsKey(provider.regionId)) {
+        typeGroup[provider.name]![provider.regionId] = provider;
+      }
     }
     
     return grouped;
@@ -73,9 +92,9 @@ class _ProviderSelectionScreenState extends ConsumerState<ProviderSelectionScree
       switch (result) {
         case VpnConnectionResult.successVpn:
         case VpnConnectionResult.successNoVpnNeeded:
-          // Navigate to browser screen
+          // Navigate to browser screen with VPN connected to the provider's region
           if (mounted) {
-            Navigator.of(context).pushReplacement(
+            Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => BrowserScreen(
                   url: provider.deepLink,
@@ -110,8 +129,7 @@ class _ProviderSelectionScreenState extends ConsumerState<ProviderSelectionScree
 
   @override
   Widget build(BuildContext context) {
-    final groupedProviders = _groupProvidersByRegion();
-    final regions = groupedProviders.keys.toList()..sort();
+    final groupedProviders = _groupProvidersByTypeAndService();
 
     return Scaffold(
       appBar: AppBar(
@@ -128,11 +146,11 @@ class _ProviderSelectionScreenState extends ConsumerState<ProviderSelectionScree
                 ],
               ),
             )
-          : _buildContent(groupedProviders, regions),
+          : _buildContent(groupedProviders),
     );
   }
 
-  Widget _buildContent(Map<RegionId, List<WatchProvider>> groupedProviders, List<RegionId> regions) {
+  Widget _buildContent(Map<ProviderType, Map<String, Map<RegionId, WatchProvider>>> groupedProviders) {
     if (_error != null) {
       return Center(
         child: Column(
@@ -162,7 +180,41 @@ class _ProviderSelectionScreenState extends ConsumerState<ProviderSelectionScree
       );
     }
 
-    if (groupedProviders.isEmpty) {
+    // Get VPN configs once
+    final vpnConfigs = ref.read(vpnConfigListProvider);
+    
+    // Build list of sections: Free first, then Subscription
+    final List<Widget> sections = [];
+    
+    // Free section
+    final freeProviders = groupedProviders[ProviderType.free];
+    if (freeProviders != null && freeProviders.isNotEmpty) {
+      sections.add(
+        _buildProviderSection(
+          title: 'Free',
+          icon: Icons.monetization_on,
+          iconColor: Colors.green,
+          providers: freeProviders,
+          vpnConfigs: vpnConfigs,
+        ),
+      );
+    }
+    
+    // Subscription section
+    final subscriptionProviders = groupedProviders[ProviderType.subscription];
+    if (subscriptionProviders != null && subscriptionProviders.isNotEmpty) {
+      sections.add(
+        _buildProviderSection(
+          title: 'Subscription',
+          icon: Icons.subscriptions,
+          iconColor: Colors.blue,
+          providers: subscriptionProviders,
+          vpnConfigs: vpnConfigs,
+        ),
+      );
+    }
+    
+    if (sections.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -177,69 +229,107 @@ class _ProviderSelectionScreenState extends ConsumerState<ProviderSelectionScree
         ),
       );
     }
-
-    return ListView.builder(
+    
+    return ListView(
       padding: const EdgeInsets.all(16.0),
-      itemCount: regions.length,
-      itemBuilder: (context, regionIndex) {
-        final region = regions[regionIndex];
-        final providers = groupedProviders[region]!;
-        
-        // Check if VPN config exists for this region
-        final vpnConfigs = ref.read(vpnConfigListProvider);
-        final hasVpnConfig = vpnConfigs.any((config) => config.regionId == region);
+      children: sections,
+    );
+  }
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16.0),
-          child: ExpansionTile(
-            leading: Icon(
-              hasVpnConfig ? Icons.vpn_key : Icons.vpn_key_off,
-              color: hasVpnConfig ? Colors.green : Colors.grey,
-            ),
-            title: Text(
-              'Region: $region',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: hasVpnConfig ? null : Colors.grey,
+  Widget _buildProviderSection({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required Map<String, Map<RegionId, WatchProvider>> providers,
+    required List vpnConfigs,
+  }) {
+    final services = providers.keys.toList()..sort();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section header
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: Row(
+            children: [
+              Icon(icon, color: iconColor, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: iconColor,
+                ),
               ),
-            ),
-            subtitle: Text(
-              hasVpnConfig 
-                  ? '${providers.length} provider${providers.length != 1 ? 's' : ''} available'
-                  : 'No VPN configured',
-              style: TextStyle(
-                color: hasVpnConfig ? Colors.grey[600] : Colors.red[300],
-              ),
-            ),
-            children: providers.map((provider) {
-              return ListTile(
-                enabled: hasVpnConfig,
-                leading: provider.logoUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: provider.logoUrl!,
-                        width: 40,
-                        height: 40,
-                        placeholder: (context, url) => const SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        errorWidget: (context, url, error) => const Icon(Icons.movie),
-                      )
-                    : const Icon(Icons.movie),
-                title: Text(provider.name),
-                subtitle: Text('Region: ${provider.regionId}'),
-                trailing: hasVpnConfig
-                    ? const Icon(Icons.arrow_forward)
-                    : const Icon(Icons.info_outline, color: Colors.grey),
-                onTap: hasVpnConfig
-                    ? () => _onProviderSelected(provider)
-                    : null,
-              );
-            }).toList(),
+            ],
           ),
-        );
-      },
+        ),
+        // Services in this section
+        ...services.map((serviceName) {
+          final regionsMap = providers[serviceName]!;
+          final regions = regionsMap.keys.toList()..sort();
+          final firstProvider = regionsMap.values.first;
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12.0),
+            child: ListTile(
+              leading: firstProvider.logoUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: firstProvider.logoUrl!,
+                      width: 50,
+                      height: 50,
+                      placeholder: (context, url) => const SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      errorWidget: (context, url, error) => const Icon(Icons.movie, size: 50),
+                    )
+                  : const Icon(Icons.movie, size: 50),
+              title: Text(
+                serviceName.toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: regions.map((region) {
+                    final hasVpnConfig = vpnConfigs.any((config) => config.regionId == region);
+                    final provider = regionsMap[region]!;
+                    
+                    return InkWell(
+                      onTap: hasVpnConfig ? () => _onProviderSelected(provider) : null,
+                      child: Chip(
+                        label: Text(region),
+                        backgroundColor: hasVpnConfig 
+                            ? Colors.blue[100] 
+                            : Colors.grey[300],
+                        labelStyle: TextStyle(
+                          color: hasVpnConfig ? Colors.blue[900] : Colors.grey[600],
+                          fontWeight: hasVpnConfig ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        avatar: Icon(
+                          hasVpnConfig ? Icons.check_circle : Icons.info_outline,
+                          size: 16,
+                          color: hasVpnConfig ? Colors.green : Colors.grey[600],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+        const SizedBox(height: 16),
+      ],
     );
   }
 }

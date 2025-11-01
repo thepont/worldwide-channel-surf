@@ -5,6 +5,7 @@ import 'package:worldwide_channel_surf/providers/vpn_config_provider.dart';
 import 'package:worldwide_channel_surf/providers/vpn_status_provider.dart';
 import 'package:worldwide_channel_surf/providers/user_settings_provider.dart';
 import 'package:worldwide_channel_surf/core/vpn_client_service.dart';
+import 'package:worldwide_channel_surf/core/database_service.dart';
 
 enum VpnConnectionResult {
   successVpn,
@@ -66,6 +67,13 @@ class VpnOrchestratorService {
       if (success) {
         ref.read(vpnStatusProvider.notifier).state = VpnStatus.connected;
         ref.read(vpnConnectedRegionProvider.notifier).state = targetRegionId;
+        
+        // Track that this region was used
+        final dbService = DatabaseService();
+        await dbService.incrementRegionUsage(targetRegionId);
+        // Refresh the usage provider so the list is sorted differently next time
+        ref.invalidate(regionUsageProvider);
+        
         return VpnConnectionResult.successVpn;
       } else {
         ref.read(vpnStatusProvider.notifier).state = VpnStatus.error;

@@ -1,6 +1,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:worldwide_channel_surf/models/vpn_config.dart';
+import 'package:worldwide_channel_surf/models/typedefs.dart';
 
 /// Database service for managing VPN configurations
 /// Uses sqflite to store user's VPN configs locally
@@ -11,7 +13,7 @@ class DatabaseService {
   DatabaseService._internal();
 
   static Database? _database;
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 2; // Bumped for region_usage table
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -20,12 +22,13 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
+    final dbPath = await sqflite.getDatabasesPath();
     final path = join(dbPath, 'vpn_configs.db');
     return await openDatabase(
       path,
       version: _databaseVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -40,6 +43,24 @@ class DatabaseService {
         custom_ovpn_content TEXT
       )
     ''');
+    
+    await db.execute('''
+      CREATE TABLE region_usage(
+        regionId TEXT PRIMARY KEY,
+        usageCount INTEGER NOT NULL
+      )
+    ''');
+  }
+  
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS region_usage(
+          regionId TEXT PRIMARY KEY,
+          usageCount INTEGER NOT NULL
+        )
+      ''');
+    }
   }
 
   // --- CRUD Operations for VPN Configs ---
@@ -104,6 +125,44 @@ class DatabaseService {
     );
     if (maps.isEmpty) return null;
     return VpnConfig.fromMap(maps.first);
+  }
+
+  // --- Region Usage Tracking ---
+
+  /// Increment the usage count for a region
+  Future<void> incrementRegionUsage(RegionId regionId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final List<Map> maps = await txn.query(
+        'region_usage',
+        where: 'regionId = ?',
+        whereArgs: [regionId],
+      );
+      if (maps.isEmpty) {
+        await txn.insert('region_usage', {
+          'regionId': regionId,
+          'usageCount': 1,
+        });
+      } else {
+        final int currentCount = maps.first['usageCount'] as int;
+        await txn.update(
+          'region_usage',
+          {'usageCount': currentCount + 1},
+          where: 'regionId = ?',
+          whereArgs: [regionId],
+        );
+      }
+    });
+  }
+
+  /// Get all region usage counts
+  Future<Map<RegionId, int>> getRegionUsage() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('region_usage');
+    return {
+      for (var map in maps)
+        map['regionId'] as String: map['usageCount'] as int
+    };
   }
 }
 

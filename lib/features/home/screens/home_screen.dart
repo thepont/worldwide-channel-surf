@@ -11,9 +11,7 @@ import 'package:worldwide_channel_surf/core/geo_ip_service.dart';
 import 'package:worldwide_channel_surf/core/tmdb_service.dart';
 import 'package:worldwide_channel_surf/core/device_auth_service.dart';
 import 'package:worldwide_channel_surf/core/device_info_service.dart';
-import 'package:worldwide_channel_surf/core/vpn_orchestrator_service.dart';
-import 'package:worldwide_channel_surf/features/browser/screens/browser_screen.dart';
-import 'package:worldwide_channel_surf/features/home/screens/provider_selection_screen.dart';
+import 'package:worldwide_channel_surf/features/details/screens/show_details_screen.dart';
 
 /// Provider for trending shows based on current region
 final trendingShowsProvider = FutureProvider.family<List<ShowSummary>, RegionId>(
@@ -24,6 +22,21 @@ final trendingShowsProvider = FutureProvider.family<List<ShowSummary>, RegionId>
     }
     final tmdbService = TmdbService(apiKey: apiKey);
     return await tmdbService.getTrendingShows(region);
+  },
+);
+
+/// Provider for search results
+final searchShowsProvider = FutureProvider.family<List<ShowSummary>, String>(
+  (ref, query) async {
+    final apiKey = ref.watch(tmdbApiKeyProvider);
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('TMDb API key not set');
+    }
+    if (query.trim().isEmpty) {
+      return [];
+    }
+    final tmdbService = TmdbService(apiKey: apiKey);
+    return await tmdbService.searchContent(query);
   },
 );
 
@@ -71,65 +84,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _onShowTap(BuildContext context, ShowSummary show) async {
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-
-    try {
-      // Get all watch providers for this show across all regions
-      final apiKey = ref.read(tmdbApiKeyProvider);
-      if (apiKey == null) {
-        throw Exception('TMDb API key not set');
-      }
-      
-      final tmdbService = TmdbService(apiKey: apiKey);
-      final providers = await tmdbService.getAllWatchProviders(
-        show.id,
-        show.mediaType,
+    // Navigate directly to ShowDetailsScreen - it will handle fetching and displaying providers
+    if (mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ShowDetailsScreen(
+            showId: show.id,
+            mediaType: show.mediaType,
+          ),
+        ),
       );
-
-      // Pop loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      if (providers.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('No watch providers found for "${show.name}"'),
-            ),
-          );
-        }
-        return;
-      }
-
-      // Navigate to provider selection screen
-      if (mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ProviderSelectionScreen(
-              show: show,
-              providers: providers,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      // Pop loading dialog if still showing
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-          ),
-        );
-      }
     }
   }
 
@@ -147,31 +111,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    // If no region set, show loading
-    if (currentRegion == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('International Content Browser'),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
+    // Use detected region or default to 'US' for trending shows
+    // Region selector removed - not needed since user selects region via provider
+    final regionForTrending = currentRegion ?? 'US';
 
-    // Main content: Trending shows GridView
+    // Main content: Trending shows GridView with search
     return Scaffold(
       appBar: AppBar(
         title: const Text('International Content Browser'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: _RegionDropdown(currentRegion: currentRegion),
-          ),
-        ],
       ),
-      body: _TrendingShowsGrid(
-        region: currentRegion,
+      body: _ContentGridWithSearch(
+        region: regionForTrending,
         onShowTap: (show) => _onShowTap(context, show),
       ),
     );
@@ -571,33 +521,86 @@ class _ApiKeySetupScreenState extends ConsumerState<_ApiKeySetupScreen> {
   }
 }
 
-/// Region dropdown widget
-class _RegionDropdown extends ConsumerWidget {
-  final RegionId currentRegion;
 
-  const _RegionDropdown({required this.currentRegion});
+/// Content grid with search bar
+class _ContentGridWithSearch extends ConsumerStatefulWidget {
+  final RegionId region;
+  final Function(ShowSummary) onShowTap;
+
+  const _ContentGridWithSearch({
+    required this.region,
+    required this.onShowTap,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Common regions for dropdown
-    final regions = ['AU', 'UK', 'US', 'FR', 'DE', 'CA', 'IT', 'ES'];
+  ConsumerState<_ContentGridWithSearch> createState() => _ContentGridWithSearchState();
+}
 
-    return DropdownButton<RegionId>(
-      value: currentRegion,
-      hint: const Text('Set Region', style: TextStyle(color: Colors.white)),
-      underline: Container(),
-      icon: const Icon(Icons.public, color: Colors.white),
-      dropdownColor: Colors.blueGrey[800],
-      style: const TextStyle(color: Colors.white),
-      onChanged: (RegionId? newValue) {
-        if (newValue != null) {
-          ref.read(currentRegionProvider.notifier).state = newValue;
-        }
-      },
-      items: regions.map((region) => DropdownMenuItem<RegionId>(
-        value: region,
-        child: Text(region),
-      )).toList(),
+class _ContentGridWithSearchState extends ConsumerState<_ContentGridWithSearch> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+      _isSearching = query.trim().isNotEmpty;
+    });
+  }
+
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _isSearching = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search for movies and TV shows...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: _clearSearch,
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+            ),
+            onChanged: _onSearchChanged,
+            onSubmitted: _onSearchChanged,
+          ),
+        ),
+        // Content grid (trending or search results)
+        Expanded(
+          child: _isSearching
+              ? _SearchResultsGrid(
+                  query: _searchQuery,
+                  onShowTap: widget.onShowTap,
+                )
+              : _TrendingShowsGrid(
+                  region: widget.region,
+                  onShowTap: widget.onShowTap,
+                ),
+        ),
+      ],
     );
   }
 }
@@ -650,6 +653,71 @@ class _TrendingShowsGrid extends ConsumerWidget {
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
             Text('Error loading shows: ${err.toString()}'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// GridView of search results
+class _SearchResultsGrid extends ConsumerWidget {
+  final String query;
+  final Function(ShowSummary) onShowTap;
+
+  const _SearchResultsGrid({
+    required this.query,
+    required this.onShowTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showsAsync = ref.watch(searchShowsProvider(query));
+
+    return showsAsync.when(
+      data: (shows) {
+        if (shows.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.search_off, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  'No results found for "$query"',
+                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(8.0),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8.0,
+            mainAxisSpacing: 8.0,
+            childAspectRatio: 0.7,
+          ),
+          itemCount: shows.length,
+          itemBuilder: (context, index) {
+            final show = shows[index];
+            return _ShowPosterCard(
+              show: show,
+              onTap: () => onShowTap(show),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Error searching: ${err.toString()}'),
           ],
         ),
       ),
