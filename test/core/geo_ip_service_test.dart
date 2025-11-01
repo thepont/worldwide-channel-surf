@@ -4,13 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:worldwide_channel_surf/core/geo_ip_service.dart';
-import 'package:worldwide_channel_surf/models/typedefs.dart';
 
 void main() {
   group('GeoIpService', () {
     test('should map GB country code to UK', () {
       final container = ProviderContainer();
-      final service = container.read(geoIpServiceProvider);
+      container.read(geoIpServiceProvider);
 
       // Access private method through reflection or test the mapping indirectly
       // Since _mapCountryCodeToRegionId is private, we test via getRegionFromIp
@@ -20,9 +19,13 @@ void main() {
       // We can't directly test private methods, but we can test the public API
       // with mocked HTTP responses
       expect(mockService, isNotNull);
+      container.dispose();
     });
 
     test('should parse valid IP API response', () async {
+      // Note: MockClient is created but not used yet as GeoIpService doesn't accept a client parameter
+      // In a real implementation, we'd inject the client for testing
+      // ignore: unused_local_variable
       final mockClient = MockClient((request) async {
         if (request.url.toString() == 'http://ip-api.com/json') {
           return http.Response(
@@ -44,6 +47,7 @@ void main() {
       final service = container.read(geoIpServiceProvider);
 
       expect(service, isA<GeoIpService>());
+      container.dispose();
     });
 
     test('should handle network errors gracefully', () async {
@@ -53,6 +57,7 @@ void main() {
       final service = container.read(geoIpServiceProvider);
 
       expect(service.getRegionFromIp, isA<Function>());
+      container.dispose();
       
       // In a real scenario with mocked HTTP, we'd expect null on error
       // final result = await service.getRegionFromIp();
@@ -67,6 +72,7 @@ void main() {
       // Verify service structure
       expect(service, isNotNull);
       expect(service.getRegionFromIp, returnsNormally);
+      container.dispose();
     });
   });
 }

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:worldwide_channel_surf/core/database_service.dart';
-import 'package:worldwide_channel_surf/models/channel.dart';
 
 void main() {
   group('DatabaseService', () {

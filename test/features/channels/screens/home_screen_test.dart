@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:worldwide_channel_surf/features/channels/screens/home_screen.dart';
-import 'package:worldwide_channel_surf/providers/app_data_provider.dart';
 import 'package:worldwide_channel_surf/providers/user_settings_provider.dart';
 
 void main() {
@@ -21,7 +20,6 @@ void main() {
 
       // Should show loading initially, then channels
       // Since region detection is async, we might see loading state first
-      final channelFinder = find.text('BBC iPlayer');
       
       // Pump until we find a channel or timeout
       await tester.pumpAndSettle();
@@ -51,12 +49,15 @@ void main() {
     });
 
     testWidgets('should display region dropdown', (WidgetTester tester) async {
-      final container = ProviderContainer();
-      container.read(currentRegionProvider.notifier).state = 'UK';
+      final container = ProviderContainer(
+        overrides: [
+          currentRegionProvider.overrideWith((ref) => 'UK'),
+        ],
+      );
 
       await tester.pumpWidget(
         ProviderScope(
-          container: container,
+          parent: container,
           child: const MaterialApp(
             home: HomeScreen(),
           ),
@@ -73,12 +74,15 @@ void main() {
     });
 
     testWidgets('should display channel when region is set', (WidgetTester tester) async {
-      final container = ProviderContainer();
-      container.read(currentRegionProvider.notifier).state = 'UK';
+      final container = ProviderContainer(
+        overrides: [
+          currentRegionProvider.overrideWith((ref) => 'UK'),
+        ],
+      );
 
       await tester.pumpWidget(
         ProviderScope(
-          container: container,
+          parent: container,
           child: const MaterialApp(
             home: HomeScreen(),
           ),

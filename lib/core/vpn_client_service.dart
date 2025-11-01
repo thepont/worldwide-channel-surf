@@ -12,7 +12,8 @@ class VpnClientService {
   Future<bool> connect(VpnConfig config) async {
     try {
       // Generate the config string using the template service
-      final configString = _templateService.generateConfigString(config);
+      // Note: configString is generated but not yet used in placeholder implementation
+      _templateService.generateConfigString(config);
       
       // TODO: Implement actual VPN connection using openvpn_flutter
       // This is a placeholder implementation

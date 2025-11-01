@@ -5,7 +5,6 @@ import 'package:worldwide_channel_surf/models/vpn_config.dart';
 import 'package:worldwide_channel_surf/providers/vpn_config_provider.dart';
 import 'package:worldwide_channel_surf/providers/vpn_status_provider.dart';
 import 'package:worldwide_channel_surf/providers/user_settings_provider.dart';
-import 'package:worldwide_channel_surf/core/vpn_client_service.dart';
 
 void main() {
   group('VpnOrchestratorService', () {
@@ -27,7 +26,7 @@ void main() {
 
       // Connect to UK region (should bypass VPN)
       final result = await orchestrator.connectToRegion(
-        container.read,
+        container,
         'UK',
       );
 
@@ -45,7 +44,7 @@ void main() {
 
       // Try to connect to FR (no config exists)
       final result = await orchestrator.connectToRegion(
-        container.read,
+        container,
         'FR',
       );
 
@@ -69,7 +68,7 @@ void main() {
       // Mock VPN client to return success
       // Note: In a real scenario, you'd use a mock for VpnClientService
       final result = await orchestrator.connectToRegion(
-        container.read,
+        container,
         'FR',
       );
 
@@ -92,7 +91,7 @@ void main() {
 
       // Try to connect to FR again (should be a no-op)
       final result = await orchestrator.connectToRegion(
-        container.read,
+        container,
         'FR',
       );
 
@@ -122,7 +121,7 @@ void main() {
       notifier.addConfig(auConfig);
 
       // Connect to FR first
-      await orchestrator.connectToRegion(container.read, 'FR');
+      await orchestrator.connectToRegion(container, 'FR');
       
       // Verify we're "connected" to FR
       expect(
@@ -131,7 +130,7 @@ void main() {
       );
 
       // Connect to AU (should disconnect FR first)
-      await orchestrator.connectToRegion(container.read, 'AU');
+      await orchestrator.connectToRegion(container, 'AU');
 
       // Should attempt to connect to AU
       // The exact status depends on VPN client mock behavior
