@@ -33,8 +33,20 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Verify Flutter setup
-        run: flutter doctor -v
+      - name: Verify Flutter setup (Debug)
+        run: |
+          echo "=== Flutter Version ==="
+          flutter --version
+          echo ""
+          echo "=== Flutter Doctor (Verbose) ==="
+          flutter doctor -v
+          echo ""
+          echo "=== Flutter Pub Outdated Check ==="
+          flutter pub outdated || true
+          echo ""
+          echo "=== Test Environment Check ==="
+          echo "Dart SDK: $(dart --version 2>&1 || echo 'Not found')"
+          echo "Flutter SDK: $(flutter --version 2>&1 || echo 'Not found')"
 
       - name: Run Flutter analyzer
         run: flutter analyze
